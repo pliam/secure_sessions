@@ -1,0 +1,108 @@
+= Secure Sessions
+
+A Ruby on Rails plugin to securely manage multiple sessions while resisting 
+session highjacking.
+
+
+= Web Session Security
+
+Here's an unfortunate fact about web security: if you want to resist session
+highjacking for secure requests (port 443) AND you want to maintain any kind 
+of session state for HTTP requests (port 80), then you need a minimum of 2 
+cookies:
+
+* A secure cookie (with the secure flag set in Set-Cookie header),
+* An "insecure" cookie (without the secure flag).
+
+You may need other cookies too, say to prove that an admin logged in with an
+X.509 certificate.  Each such cookie carries a distinct set of request/response 
+behaviors.  It takes some care to make sure that a weak cookie cannot be 
+exploited by a third party hacker to acquire the privileges or identity of
+a legitimate user.
+
+The goal of this plugin is to provide easy-to-use session management when many
+sessions must coexist.
+
+
+== The Rails Session
+
+Out of the box, Rails manages a single cookie and binds it to the session store 
+that is available via syntax such as 'session[:sales_account_id]'.  You can 
+force that session to have the secure flag and the http_only flag set, but
+then all the nice session machinery becomes unavailable on the server over http, 
+and the non-secure session state is unavailable to any client which might need 
+it.
+
+Our approach is to leave the standard Rails cookie to the user, and manage 
+secure cookies behind the scene.  See the example below.
+
+
+== Example
+
+Inside environment.rb, something like
+
+    ## general
+    SecureSessions.secret = '6ac371cc3dc9d38cf33e5c146617df75' # that's `echo changeme | md5sum`
+    
+    ## cookie credential definitions
+    SecureSessions::Cookie.key = '_secure_sessions'
+    SecureSessions::Cookie.domain = '.yourdomain.com'
+    SecureSessions::Cookie.delete_to = {:controller => 'admin', :action => 'logout'} # go here to force logout
+    SecureSessions::Cookie.logout_to = {:controller => 'admin', :action => 'login'} # go here *after* logging out
+    # should probably only uncomment for debugging
+    # SecureSessions::Cookie.http_only = false
+    
+    ## username/password credential definitions
+    SecureSessions::Password.validate_proc = proc do |ctrl| 
+      # define any proc here which validates username/password etc, and returns a unique ID
+      return nil unless User.authenticate(ctrl.params[:login], ctrl.params[:password])
+      User.find_by_login(ctrl.params[:login]).id
+    end
+    SecureSessions::Password.fail_to = {:controller => 'admin', :action => 'login'}
+    SecureSessions::Password.default_to = 'https://www.yourdomain.com/admin/my_account'
+
+Then in a controller for which you need strong security,
+
+    class YourAdminController < ApplicationController
+
+      # all admin activities (except logging in) require authentication
+      ssl_required :index, :login, :logout # need SSL Requirement too right now
+      secure_login :login # declare login action to issue strong cookies upon validation
+      secure_logout :logout # declare logout action to delete the strong cookies
+      before_filter :authenticate, :except => :login # force strong authentication
+    
+    
+      # your login/logout actions & forms need only worry about layout
+      def login
+        @suppress_nav = true # tell the layout how to process
+      end
+      def logout
+        @suppress_nav = true # tell the layout how to process
+      end
+    
+      # your actions 
+      def index 
+        # sensitive actions are protected by mixed-in authenticate method
+      end
+    end
+
+But for non-sensitive controllers, use logged_in? Boolean method to switch appearance,
+etc. 
+
+    class YourClearTextController < ApplicationController
+      def myaction
+        # [...]
+        arrange_hello(session[:full_name]) if logged_in?
+        # [...]
+      end 
+    end 
+
+
+= Downloading
+
+  git://github.com/pliam/secure_sessions.git
+
+
+= Copying
+
+Copyright (c) 2008 John Pliam, released under the MIT license
