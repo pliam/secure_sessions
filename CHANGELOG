@@ -1,0 +1,12 @@
+= CHANGELOG
+
+== Release 0.2 (23), Fri Sep 12 12:38:42 PDT 2008
+
+* This change log added.
+* Proper deletion of cookies via RoR API (instead of manually re-issuing).
+
+
+== Release 0.1 (20), Mon Sep 1 01:29:57 PDT 2008
+
+* Initial git repo and "release".
+* Solves simplest use-case of maintaining strong authentication with an SSL-only cookie while allowing the default RoR session cookie and it's cache to work over plain HTTP.

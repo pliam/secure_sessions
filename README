@@ -4,7 +4,7 @@ A Ruby on Rails plugin to securely manage multiple sessions while resisting
 session highjacking.
 
 
-= Web Session Security
+== Web Session Security
 
 Here's an unfortunate fact about web security: if you want to resist session
 highjacking for secure requests (port 443) AND you want to maintain any kind 

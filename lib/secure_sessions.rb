@@ -241,16 +241,11 @@ class SecureSessions
       )
     end
     def delete
-      # cookies.delete cky_key won't work here 
-      # browser won't respect defaults so we must "issue" an empty cookie w/ matching params
-      cookies[cky_key] = {
-        :value => '',
-        # :expires => 'Thu, 01 Jan 1970 00:00:00 GMT',
-        # :expires => Time.now - 1.year,
-        :expires => Time.now - Time.now.to_i.seconds,
+      # browser won't respect defaults, so we must add options hash
+      cookies.delete(cky_key,
         :domain => SecureSessions::Cookie.domain,
         :secure => ssl_only_cookie?
-      }
+      )
     end
 
     # override authenticated? to invoke the strongest possible proof of ID
