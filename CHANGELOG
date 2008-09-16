@@ -1,5 +1,10 @@
 = CHANGELOG
 
+== Release 0.3 (25), Mon Sep 15 17:40:50 PDT 2008
+
+* Fledgling X.509 client certificate login, including identification and authorization after SSL is finished.
+
+
 == Release 0.2 (23), Fri Sep 12 12:38:42 PDT 2008
 
 * This change log added.

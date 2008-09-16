@@ -37,7 +37,7 @@ Our approach is to leave the standard Rails cookie to the user, and manage
 secure cookies behind the scene.  See the example below.
 
 
-== Example
+== Example Configuration
 
 Inside environment.rb, something like
 
@@ -60,6 +60,18 @@ Inside environment.rb, something like
     end
     SecureSessions::Password.fail_to = {:controller => 'admin', :action => 'login'}
     SecureSessions::Password.default_to = 'https://www.yourdomain.com/admin/my_account'
+
+    ## X.509 SSL client certificate credential
+    SecureSessions::X509.validate_proc = proc do |ctrl|
+      user = User.find_by_email(ctrl.request.env['SSL_CLIENT_S_DN_Email'])
+      return nil unless user
+      user.id
+    end
+    SecureSessions::X509.fail_to = {:controller => 'admin', :action => 'x509'}
+    SecureSessions::X509.default_to = 'https://www.acme.com/admin/my_account/status'
+
+
+== Username/Password Example
 
 Then in a controller for which you need strong security,
 
@@ -96,6 +108,40 @@ etc.
         # [...]
       end 
     end 
+
+== X.509 SSL Client Certificate Example
+
+First of all, your controller is very similar to that of the Password example:
+
+    class YourAdminController < ApplicationController
+      ssl_required :index, :x509, :logout # need SSL Requirement too right now
+      secure_logout :logout # declare logout action to delete the strong cookies
+      before_filter :authenticate, :except => [:x509, :landing]
+      x509_login :x509    # delcare the 'x509' action as triggering client cert validation
+
+      # X.509 cert login needs no user input, so the controller & view can be empty
+      def x509
+      end
+
+      # nice to have a real landing page but not necessary
+      def landing
+        @suppress_nav = true # tell the layout how to process
+      end
+    end
+
+But also for this to work, you'll need some help from Apache to make X.500 distinguished 
+name (DN) available to rails code and to trigger the SSL client certification exchange at
+the correct moment.  Here's a sample, somewhere inside <VirtualHost *:443>...</VirtualHost>
+
+  SSLVerifyClient none
+  SSLCACertificateFile /etc/apache2/ssl.crt/ca-cert.pem
+  <Location /admin/x509>
+    SSLVerifyClient require
+    SSLVerifyDepth  1
+    SSLOptions +StdEnvVars
+  </Location>
+
+Notice that minimally, you must place your signing CA's cert inside Apache's config.
 
 
 = Downloading

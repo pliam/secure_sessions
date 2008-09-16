@@ -11,13 +11,14 @@ class SecureSessions
   # credential enforcer factory class method
   def self.factory(ctrl, ss, ckys)
     # in future this will be more configurable, but for now it's the most needed use-case
-    pw = SecureSessions::Password.new(ctrl, ss)
+    # pw = SecureSessions::Password.new(ctrl, ss)
+    cert = SecureSessions::X509.new(ctrl, ss)
     # cky = SecureSessions::Cookie.new(ctrl, ss)
     scky = SecureSessions::SslCookie.new(ctrl, ss, ckys)
     # our sessions use primarily secure cookies, but have a password prerequisite at login
     SecureSessions::Composite.new(
       :primary => scky,
-      :required => pw
+      :required => cert
     )
   end
 
@@ -117,6 +118,11 @@ class SecureSessions
       # define a logout action
       def secure_logout(action)
         before_filter :delete_credentials, :only => action
+      end
+      # define an action as an X.509 client cert "login"
+      def x509_login(action)
+        # no stopping for input, just validate and issue in one pass
+        before_filter :return_from_authentication, :only => action
       end
     end
 
@@ -283,6 +289,27 @@ class SecureSessions
     # simply chain to the user-supplied verification Proc
     def validate
       return false unless (uid = validate_proc.call(controller))
+      identify(uid)
+    end
+
+    def follow_message; 'Please Log in First.'; end
+    def fail_message; 'Username and/or Password incorrect.'; end
+  end
+  #
+  # X.509 client certificate validation
+  #
+  class X509 < ::SecureSessions
+    cattr_accessor :validate_proc, :fail_to, :default_to
+
+    def initialize(ctrl, ss)
+      self.controller = ctrl 
+      self.secure_session = ss
+    end
+
+    # simply chain to the user-supplied verification Proc
+    def validate
+      # here we don't retry into an infinite loop
+      raise "client certificate failure" unless (uid = validate_proc.call(controller))
       identify(uid)
     end
 
