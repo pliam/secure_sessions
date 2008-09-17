@@ -43,6 +43,9 @@ Inside environment.rb, something like
 
     ## general
     SecureSessions.secret = '6ac371cc3dc9d38cf33e5c146617df75' # that's `echo changeme | md5sum`
+    SecureSessions.specification = 'SslCookie requires Password' # issue ssl-only cookie based on password login
+    # or 
+    SecureSessions.specification = 'SslCookie requires X509' # issue ssl-only cookie based on client certificate
     
     ## cookie credential definitions
     SecureSessions::Cookie.key = '_secure_sessions'

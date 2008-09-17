@@ -5,21 +5,22 @@ require 'digest/sha1'
 # secure_sessions.rb
 #
 class SecureSessions
-  cattr_accessor :secret
+  cattr_accessor :secret, :specification
   attr_accessor :controller, :secure_session
 
-  # credential enforcer factory class method
+  # credential enforcer factory
   def self.factory(ctrl, ss, ckys)
-    # in future this will be more configurable, but for now it's the most needed use-case
-    # pw = SecureSessions::Password.new(ctrl, ss)
-    cert = SecureSessions::X509.new(ctrl, ss)
-    # cky = SecureSessions::Cookie.new(ctrl, ss)
-    scky = SecureSessions::SslCookie.new(ctrl, ss, ckys)
-    # our sessions use primarily secure cookies, but have a password prerequisite at login
-    SecureSessions::Composite.new(
-      :primary => scky,
-      :required => cert
-    )
+    args = {:controller => ctrl, :secure_session => ss, :cookies => ckys}
+    if specification.class == String # string defines spec in simple DSL
+      # assume spec of form: "<class> requires <class> requires <class>"
+      return specification.split(/\s+requires\s+/).map{|cred| SecureSessions.const_get(cred).new(args)}.inject do |primary, required|
+        primary.requires(required)
+      end
+    elsif specification.class == Proc # delegate to proc, if supplied
+      return specification.call(args)
+    else # raise exception, otherwise
+      raise "Secure Sessions Plugin: invalid credential specification"
+    end
   end
 
 
@@ -176,6 +177,12 @@ class SecureSessions
   # common code, template methods for credential objects
   # 
 
+
+  # requires used to construct composites
+  def requires(required)
+    SecureSessions::Composite.new(:primary => self, :required => required)
+  end
+
   # identify subject with the provided user ID
   def identify(uid)
     secure_session[:uid] = uid
@@ -213,10 +220,10 @@ class SecureSessions
     attr_accessor :cookies
     cattr_accessor :key, :domain, :delete_to, :http_only, :logout_to
 
-    def initialize(ctrl, ss, ckys)
-      self.controller = ctrl
-      self.secure_session = ss
-      self.cookies = ckys
+    def initialize(args)
+      self.controller = args[:controller]
+      self.secure_session = args[:secure_session]
+      self.cookies = args[:cookies]
     end
 
     def issue
@@ -281,9 +288,9 @@ class SecureSessions
   class Password < ::SecureSessions
     cattr_accessor :validate_proc, :fail_to, :default_to
 
-    def initialize(ctrl, ss)
-      self.controller = ctrl 
-      self.secure_session = ss
+    def initialize(args)
+      self.controller = args[:controller] 
+      self.secure_session = args[:secure_session]
     end
 
     # simply chain to the user-supplied verification Proc
@@ -301,9 +308,9 @@ class SecureSessions
   class X509 < ::SecureSessions
     cattr_accessor :validate_proc, :fail_to, :default_to
 
-    def initialize(ctrl, ss)
-      self.controller = ctrl 
-      self.secure_session = ss
+    def initialize(args)
+      self.controller = args[:controller] 
+      self.secure_session = args[:secure_session]
     end
 
     # simply chain to the user-supplied verification Proc
